@@ -1,0 +1,5 @@
+*.xlsx
+.ipynb_checkpoints/
+*.pdf
+*.ini
+.idea/
