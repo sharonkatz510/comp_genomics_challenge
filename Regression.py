@@ -56,12 +56,6 @@ class LinReg:
             plt.colorbar(), plt.show()
         if return_flag: return feat_label_corr, feature_feature_corr
 
-    def data_model(self):
-        x_train, x_test, y_train, y_test = train_test_split(self.X, self.Y, test_size=0.2)
-        reg = LinearRegression()
-        reg.fit(x_train, y_train)
-        print("R^2 for linear regression is:", reg.score(x_test, y_test))
-
     def plot_col_num(self, col_num):
         """
         :param col_num:  data frame column number
@@ -71,6 +65,12 @@ class LinReg:
         plt.scatter(self.X[col], lr.Y)
         plt.xlabel(col)
         plt.ylabel('PA')
+
+    def data_model(self):
+        x_train, x_test, y_train, y_test = train_test_split(self.X, self.Y, test_size=0.2)
+        reg = LinearRegression()
+        reg.fit(x_train, y_train)
+        print("R^2 for linear regression is:", reg.score(x_test, y_test))
 
 
 if __name__ == "__main__":
