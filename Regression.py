@@ -33,20 +33,28 @@ class LinReg:
     def __init__(self, filename):
         data = pd.read_excel(filename, index_col='Gene index')
         self.str_seriesses = data[[col for col in data.columns if col in ['PA', 'UTR5', 'ORF']]]
-        self.X = data[[col for col in data.columns if col not in ['PA', 'UTR5', 'ORF']]]
-        self.X["Free_var"] = np.ones(len(self.X))
+        x = data[[col for col in data.columns if col not in ['PA', 'UTR5', 'ORF']]]
+        self.X = x.copy()
+        self.X['free_var'] = np.ones(len(x))
         self.Y = data['PA']
 
-    def get_conf_mat(self, plot_flag=False):
-        conf_mat = pd.concat([self.X, self.Y], axis=1).corr()
-        truncated_conf_mat = conf_mat.values - np.eye(conf_mat.shape[0])
+    def get_conf_mat(self, plot_flag=False, return_flag=False):
+        """
+        :param plot_flag: plots if True
+        :param return_flag: returns feat-feat and feat-label correlation mat\vec if True
+        """
+        conf_mat = pd.concat([self.X.copy().drop(columns='free_var'), self.Y], axis=1).corr(method='spearman')
+        truncated_conf_mat = np.abs(conf_mat.values - np.eye(conf_mat.shape[0]))
+        feat_label_corr = truncated_conf_mat[-1, :]
+        feature_feature_corr = truncated_conf_mat[0:-2, 0:-2]
         print(f"\nMax Feature-Label Correlation: {np.max(truncated_conf_mat[-1, :])} \n")
-        print(f"Feature-Label Correlation: \n{truncated_conf_mat[-1, :]} \n")
         if plot_flag:
-            plt.imshow(truncated_conf_mat)
+            print(f"Feature-Label Correlation: \n{feat_label_corr} \n")
+            plt.imshow(truncated_conf_mat, interpolation='nearest')
             plt.xticks(np.arange(conf_mat.shape[0]), conf_mat.columns, size=7, rotation=45)
             plt.yticks(np.arange(conf_mat.shape[0]), conf_mat.columns, size=7, rotation=45)
             plt.colorbar(), plt.show()
+        if return_flag: return feat_label_corr, feature_feature_corr
 
     def data_model(self):
         x_train, x_test, y_train, y_test = train_test_split(self.X, self.Y, test_size=0.2)
@@ -54,8 +62,24 @@ class LinReg:
         reg.fit(x_train, y_train)
         print("R^2 for linear regression is:", reg.score(x_test, y_test))
 
+    def plot_col_num(self, col_num):
+        """
+        :param col_num:  data frame column number
+        """
+        plt.figure()
+        col = self.X.columns[col_num]
+        plt.scatter(self.X[col], lr.Y)
+        plt.xlabel(col)
+        plt.ylabel('PA')
+
 
 if __name__ == "__main__":
     lr = LinReg("Known_set_Bacillus.xlsx")
-    # lr.get_conf_mat(True)
+    # flc, ffc = lr.get_conf_mat(plot_flag=False, return_flag=True)
+    # lr.get_conf_mat(plot_flag=True)
     # lr.data_model()
+    # lr.plot_col_num(0)
+    # lr.remove_shit_features()
+
+
+
