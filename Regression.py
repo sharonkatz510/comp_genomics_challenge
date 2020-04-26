@@ -25,7 +25,9 @@ NT2AA_dict = {
     }
 
 
-def get_aa(codons):
+def get_aa(seq):
+    if len(seq) % 3 > 0: seq = seq[:-1 - (len(seq) % 3)]
+    codons = [seq[i:i + 3] for i in range(0, int(len(seq)), 3)]
     return "".join([NT2AA_dict[codon] for codon in codons])
 
 
@@ -34,9 +36,25 @@ class LinReg:
         data = pd.read_excel(filename, index_col='Gene index')
         self.str_seriesses = data[[col for col in data.columns if col in ['PA', 'UTR5', 'ORF']]]
         x = data[[col for col in data.columns if col not in ['PA', 'UTR5', 'ORF']]]
-        self.X = x.copy()
-        self.X['free_var'] = np.ones(len(x))
+        self.X = x.drop(columns='argenin frequnecy ')
+        self.add_features(len(x))
+        self.drop_windows()
         self.Y = data['PA']
+
+    def add_features(self, lx):
+        self.add_aa_freq()
+        self.X['free_var'] = np.ones(lx)
+
+    def add_aa_freq(self):
+        self.X['Arg_freq'] = self.get_aa_freq('R')
+        self.X['Ala_freq'] = self.get_aa_freq('A')
+        self.X['Gly_freq'] = self.get_aa_freq('G')
+        self.X['Val_freq'] = self.get_aa_freq('V')
+
+    def get_aa_freq(self, wanted_aa):
+        aas = [get_aa(nt) for nt in self.str_seriesses['ORF'].tolist()]
+        p = [aa.count(wanted_aa) / len(aa) for aa in aas]
+        return p
 
     def get_conf_mat(self, plot_flag=False, return_flag=False):
         """
@@ -50,11 +68,15 @@ class LinReg:
         print(f"\nMax Feature-Label Correlation: {np.max(truncated_conf_mat[-1, :])} \n")
         if plot_flag:
             print(f"Feature-Label Correlation: \n{feat_label_corr} \n")
-            plt.imshow(truncated_conf_mat, interpolation='nearest')
+            plt.imshow(truncated_conf_mat, interpolation='nearest', )
             plt.xticks(np.arange(conf_mat.shape[0]), conf_mat.columns, size=7, rotation=45)
             plt.yticks(np.arange(conf_mat.shape[0]), conf_mat.columns, size=7, rotation=45)
             plt.colorbar(), plt.show()
         if return_flag: return feat_label_corr, feature_feature_corr
+
+    def drop_windows(self):
+        wins = [name for name in self.X.columns if 'dow' in name]
+        self.X = self.X.drop(columns=wins)
 
     def plot_col_num(self, col_num):
         """
@@ -73,10 +95,13 @@ class LinReg:
         print("R^2 for linear regression is:", reg.score(x_test, y_test))
 
 
+
+
 if __name__ == "__main__":
     lr = LinReg("Known_set_Bacillus.xlsx")
+    self = lr
     # flc, ffc = lr.get_conf_mat(plot_flag=False, return_flag=True)
-    # lr.get_conf_mat(plot_flag=True)
+    lr.get_conf_mat(plot_flag=True)
     # lr.data_model()
     # lr.plot_col_num(0)
     # lr.remove_shit_features()
