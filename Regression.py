@@ -32,13 +32,13 @@ def get_aa(seq):
 
 
 class LinReg:
-    def __init__(self, filename):
+    def __init__(self, filename, drop_wins=False):
         data = pd.read_excel(filename, index_col='Gene index')
         self.str_seriesses = data[[col for col in data.columns if col in ['PA', 'UTR5', 'ORF']]]
         x = data[[col for col in data.columns if col not in ['PA', 'UTR5', 'ORF']]]
         self.X = x.drop(columns='argenin frequnecy ')
         self.add_features(len(x))
-        self.drop_windows()
+        if drop_wins: self.drop_windows()
         self.Y = data['PA']
 
     def add_features(self, lx):
@@ -61,7 +61,7 @@ class LinReg:
         :param plot_flag: plots if True
         :param return_flag: returns feat-feat and feat-label correlation mat\vec if True
         """
-        conf_mat = pd.concat([self.X.copy().drop(columns='free_var'), self.Y], axis=1).corr(method='spearman')
+        conf_mat = pd.concat([self.X.drop(columns='free_var'), self.Y], axis=1).corr(method='spearman')
         truncated_conf_mat = np.abs(conf_mat.values - np.eye(conf_mat.shape[0]))
         feat_label_corr = truncated_conf_mat[-1, :]
         feature_feature_corr = truncated_conf_mat[0:-2, 0:-2]
@@ -88,23 +88,18 @@ class LinReg:
         plt.xlabel(col)
         plt.ylabel('PA')
 
-    def data_model(self):
+    def get_model(self):
         x_train, x_test, y_train, y_test = train_test_split(self.X, self.Y, test_size=0.2)
         reg = LinearRegression()
         reg.fit(x_train, y_train)
         print("R^2 for linear regression is:", reg.score(x_test, y_test))
-
-
+        return reg, reg.score(x_test, y_test)
 
 
 if __name__ == "__main__":
-    lr = LinReg("Known_set_Bacillus.xlsx")
-    self = lr
-    # flc, ffc = lr.get_conf_mat(plot_flag=False, return_flag=True)
-    lr.get_conf_mat(plot_flag=True)
-    # lr.data_model()
-    # lr.plot_col_num(0)
-    # lr.remove_shit_features()
-
-
-
+    lr = LinReg("Known_set_Bacillus.xlsx", drop_wins=False)
+    # self = lr
+    # flc, ffc = lr.get_conf_mat(return_flag=True)
+    # lr.get_conf_mat(plot_flag=True)
+    # plt.figure(), plt.bar(range(len(flc)), flc), plt.xticks(range(len(flc)), list(lr.X.columns), size=7, rotation=45)
+    # lr.get_model()
