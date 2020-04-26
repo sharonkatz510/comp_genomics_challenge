@@ -1,25 +1,18 @@
+import numpy as np
 import pandas as pd
-from pylab import *
+import matplotlib.pyplot as plt
+# from pylab import *
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 
 
-data = pd.read_excel("Known_set_Bacillus.xlsx", index_col='Gene index') # optiona: add [, index_col='Gene index'] to the DF parameters
-n_samp = 20
-print(data.index)
-data.head(n_samp)
-
+data = pd.read_excel("Known_set_Bacillus.xlsx", index_col='Gene index')
+# n_samp = 20
+# data.head(n_samp)
 
 y = data["PA"]
-x = data[sort(list(set(data.columns)-{"PA","UTR5","ORF"}))]
-
-xs = x[[col for col in x.columns if col.find("dow") < 0]]
-
-x.head(n_samp)
-
-
-
-
+x = data[[col for col in data.columns if col not in ["PA", "UTR5", "ORF"]]]
+# x.head(n_samp)
 
 # cmx = pd.concat([xs,y],axis = 1).corr()
 # tcmx = np.abs(cmx.values-np.eye(cmx.shape[0]))
@@ -34,17 +27,17 @@ x.head(n_samp)
 # list(y)
 
 
-cm = pd.concat([x, y], axis=1).corr()
-tcm = np.abs(cm.values-np.eye(cm.shape[0]))
+conf_mat = pd.concat([x, y], axis=1).corr()
+# truncated_conf_mat = np.abs(conf_mat.values - np.eye(conf_mat.shape[0]))
+truncated_conf_mat = conf_mat.values - np.eye(conf_mat.shape[0])
+print(f"\nMax Feature-Label Correlation: {np.max(truncated_conf_mat[-1, :])} \n")
+print(f"Feature-Label Correlation: \n{truncated_conf_mat[-1, :]} \n")
 
-print(f"Max Label Correlation: {np.max(tcm[-1,:])} \n")
-print(f"Label Correlation: \n{tcm[-1,:]} \n\n")
 
-
-imshow(tcm)
-xticks(np.arange(cm.shape[0]), cm.columns, size=7, rotation=45)
-yticks(np.arange(cm.shape[0]), cm.columns, size=7, rotation=45)
-colorbar()
+plt.imshow(truncated_conf_mat)
+plt.xticks(np.arange(conf_mat.shape[0]), conf_mat.columns, size=7, rotation=45)
+plt.yticks(np.arange(conf_mat.shape[0]), conf_mat.columns, size=7, rotation=45)
+plt.colorbar()
 plt.show()
 
 
@@ -53,10 +46,9 @@ X["Free_var"] = np.ones(x.shape[0])
 
 
 x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-reg = LinearRegression().fit(x_train, y_train)
-print("R^2 for linear regression is:", reg.score(x_test, y_test))
+reg = LinearRegression()
 
 
 if __name__ == "__main__":
-    pass
-
+    reg.fit(x_train, y_train)
+    print("R^2 for linear regression is:", reg.score(x_test, y_test))
