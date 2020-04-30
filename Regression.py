@@ -59,7 +59,7 @@ class LinReg:
         """"
         add AA frequencies to self.X
         """
-        for i, aa in enumerate(aas): self.X[col_names[i]] = self.get_aa_freq(aa)
+        for cn, aa in zip(col_names, aas): self.X[cn] = self.get_aa_freq(aa)
 
     def get_aa_freq(self, wanted_aa):
         """
@@ -96,8 +96,8 @@ class LinReg:
         """
         :param col_num:  data frame column number
         """
-        plt.figure()
         col = self.X.iloc[:, col_num]
+        plt.figure()
         plt.scatter(self.X[col], self.Y)
         plt.xlabel(col), plt.ylabel('PA')
 
