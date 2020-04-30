@@ -26,36 +26,61 @@ NT2AA_dict = {
 
 
 def get_aa(seq):
+    """"
+    Get DNA sequence and transcribe to amino acids
+    Stop codons are translated to a _ character
+    """
     if len(seq) % 3 > 0: seq = seq[:-1 - (len(seq) % 3)]
+    # TODO: shouldn't transcription end if encountered stop codon?
+    #  --> stop codons are translated to a _ character, further processing should be done separately in my op.
     codons = [seq[i:i + 3] for i in range(0, int(len(seq)), 3)]
     return "".join([NT2AA_dict[codon] for codon in codons])
 
 
 class LinReg:
+    """
+    Gather data from file, extract additional features and labels, later use to train a linear regressor
+    """
     def __init__(self, filename, drop_wins=False):
         data = pd.read_excel(filename, index_col='Gene index')
-        self.str_seriesses = data[[col for col in data.columns if col in ['PA', 'UTR5', 'ORF']]]
-        x = data[[col for col in data.columns if col not in ['PA', 'UTR5', 'ORF']]]
+        self.str_seriesses = data[['PA', 'UTR5', 'ORF']]
+        x = data.drop(columns=['PA', 'UTR5', 'ORF'])
+
+        # TODO: why do we drop it?
+        #  --> i wanted the freq. cols to be together for visualization reasons
+        #  --> and i wanted to rename it too..
+        #  --> renaming is 1 line of pretty code but moving it to the end is ugly
+        #  --> so after looking through it, drop is the best option in my op.
+
         self.X = x.drop(columns='argenin frequnecy ')
-        self.add_features(len(x))
+        self.add_features()
         if drop_wins: self.drop_windows()
+
         self.Y = data['PA']
 
-    def add_features(self, lx):
-        self.add_aa_freq()
-        self.X['free_var'] = np.ones(lx)
+    def add_features(self):
+        self.add_aa_freq(['Arg_freq', 'Ala_freq', 'Gly_freq', 'Val_freq'], ['R', 'A', 'G', 'V'])
+        self.X['free_var'] = np.ones(len(self.X))
 
-    def add_aa_freq(self):
-        self.X['Arg_freq'] = self.get_aa_freq('R')
-        self.X['Ala_freq'] = self.get_aa_freq('A')
-        self.X['Gly_freq'] = self.get_aa_freq('G')
-        self.X['Val_freq'] = self.get_aa_freq('V')
+    def add_aa_freq(self, col_names, aas):
+        """"
+        add AA frequencies to self.X
+        """
+        for i, aa in enumerate(aas): self.X[col_names[i]] = self.get_aa_freq(aa)
 
     def get_aa_freq(self, wanted_aa):
-        aas = [get_aa(nt) for nt in self.str_seriesses['ORF'].tolist()]
-        p = [aa.count(wanted_aa) / len(aa) for aa in aas]
-        return p
+        """
+        returns the input AA's frequency
+        """
+        # TODO let's try to apply get_aa the df instead.
+        #  --> sababa, i like it!
+        aas = self.str_seriesses['ORF'].apply(get_aa)
+        return aas.apply(lambda x: x.count(wanted_aa) / len(x))
 
+    # TODO i think return_flag is redundant since python executes quietly anyway (unlike matlab)
+    #  --> it's for debug reasons - will eventually be deprecated
+    #  -->  ++ as i already mentioned, correlation is irrelevant in this case,
+    #  --> since we try to fit a continuous curve rather than a discrete set of labels
     def get_conf_mat(self, plot_flag=False, return_flag=False):
         """
         :param plot_flag: plots if True
@@ -75,26 +100,35 @@ class LinReg:
         if return_flag: return feat_label_corr, feature_feature_corr
 
     def drop_windows(self):
-        wins = [name for name in self.X.columns if 'dow' in name]
-        self.X = self.X.drop(columns=wins)
+        # TODO what does this func. do?
+        #  --> deletes the "window [1-100]" cols - some ar missnamed wndow, hence "dow" is being looked for
+        #  --> was mainly written to get R2 score with and without the window cols
+        self.X = self.X.drop(columns=[name for name in self.X.columns if 'dow' in name])
 
     def plot_col_num(self, col_num):
         """
         :param col_num:  data frame column number
         """
         plt.figure()
-        col = self.X.columns[col_num]
-        plt.scatter(self.X[col], lr.Y)
-        plt.xlabel(col)
-        plt.ylabel('PA')
+        # TODO: it is easier to use iloc ( self.X.iloc[:,col_num])
+        #  --> true that
+        col = self.X.iloc[:, col_num]
+        # TODO: lr is defined outside class scope, should it be self.Y instead?
+        #  --> 100% a bug
+        plt.scatter(self.X[col], self.Y)
+        plt.xlabel(col), plt.ylabel('PA')
 
     def get_model(self):
+        """Train a linear regressor based on self data"""
         x_train, x_test, y_train, y_test = train_test_split(self.X, self.Y, test_size=0.2)
         reg = LinearRegression()
         reg.fit(x_train, y_train)
         print("R^2 for linear regression is:", reg.score(x_test, y_test))
         return reg, reg.score(x_test, y_test)
 
+# TODO what is up with this?
+#  --> this is how you make things run only when the class is the code you run as "__main__"
+#  --> __best__.__practice__.__ever__()
 
 if __name__ == "__main__":
     lr = LinReg("Known_set_Bacillus.xlsx", drop_wins=False)
