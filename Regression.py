@@ -45,13 +45,6 @@ class LinReg:
         data = pd.read_excel(filename, index_col='Gene index')
         self.str_seriesses = data[['PA', 'UTR5', 'ORF']]
         x = data.drop(columns=['PA', 'UTR5', 'ORF'])
-
-        # TODO: why do we drop it?
-        #  --> i wanted the freq. cols to be together for visualization reasons
-        #  --> and i wanted to rename it too..
-        #  --> renaming is 1 line of pretty code but moving it to the end is ugly
-        #  --> so after looking through it, drop is the best option in my op.
-
         self.X = x.drop(columns='argenin frequnecy ')
         self.add_features()
         if drop_wins: self.drop_windows()
@@ -72,15 +65,10 @@ class LinReg:
         """
         returns the input AA's frequency
         """
-        # TODO let's try to apply get_aa the df instead.
-        #  --> sababa, i like it!
         aas = self.str_seriesses['ORF'].apply(get_aa)
         return aas.apply(lambda x: x.count(wanted_aa) / len(x))
 
-    # TODO i think return_flag is redundant since python executes quietly anyway (unlike matlab)
-    #  --> it's for debug reasons - will eventually be deprecated
-    #  -->  ++ as i already mentioned, correlation is irrelevant in this case,
-    #  --> since we try to fit a continuous curve rather than a discrete set of labels
+
     def get_conf_mat(self, plot_flag=False, return_flag=False):
         """
         :param plot_flag: plots if True
@@ -100,9 +88,9 @@ class LinReg:
         if return_flag: return feat_label_corr, feature_feature_corr
 
     def drop_windows(self):
-        # TODO what does this func. do?
-        #  --> deletes the "window [1-100]" cols - some ar missnamed wndow, hence "dow" is being looked for
-        #  --> was mainly written to get R2 score with and without the window cols
+        """
+        Remove "window" features if irrelevant
+        """
         self.X = self.X.drop(columns=[name for name in self.X.columns if 'dow' in name])
 
     def plot_col_num(self, col_num):
@@ -110,11 +98,7 @@ class LinReg:
         :param col_num:  data frame column number
         """
         plt.figure()
-        # TODO: it is easier to use iloc ( self.X.iloc[:,col_num])
-        #  --> true that
         col = self.X.iloc[:, col_num]
-        # TODO: lr is defined outside class scope, should it be self.Y instead?
-        #  --> 100% a bug
         plt.scatter(self.X[col], self.Y)
         plt.xlabel(col), plt.ylabel('PA')
 
@@ -126,9 +110,6 @@ class LinReg:
         print("R^2 for linear regression is:", reg.score(x_test, y_test))
         return reg, reg.score(x_test, y_test)
 
-# TODO what is up with this?
-#  --> this is how you make things run only when the class is the code you run as "__main__"
-#  --> __best__.__practice__.__ever__()
 
 if __name__ == "__main__":
     lr = LinReg("Known_set_Bacillus.xlsx", drop_wins=False)
