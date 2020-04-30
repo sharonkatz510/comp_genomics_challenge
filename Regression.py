@@ -68,7 +68,6 @@ class LinReg:
         aas = self.str_seriesses['ORF'].apply(get_aa)
         return aas.apply(lambda x: x.count(wanted_aa) / len(x))
 
-
     def get_conf_mat(self, plot_flag=False, return_flag=False):
         """
         :param plot_flag: plots if True
@@ -88,7 +87,9 @@ class LinReg:
         if return_flag: return feat_label_corr, feature_feature_corr
 
     def drop_windows(self):
-        """Remove "window" features if irrelevant"""
+        """
+        Remove "window" features if irrelevant
+        """
         self.X = self.X.drop(columns=[name for name in self.X.columns if 'dow' in name])
 
     def plot_col_num(self, col_num):
@@ -101,7 +102,9 @@ class LinReg:
         plt.xlabel(col), plt.ylabel('PA')
 
     def get_model(self):
-        """Train a linear regressor based on self data"""
+        """
+        Train a linear regressor based on self data
+        """
         x_train, x_test, y_train, y_test = train_test_split(self.X, self.Y, test_size=0.2)
         reg = LinearRegression()
         reg.fit(x_train, y_train)
@@ -109,7 +112,7 @@ class LinReg:
         return reg, reg.score(x_test, y_test)
 
 
-if __name__ == "__main__": # automatically load data when running this file
+if __name__ == "__main__":
     lr = LinReg("Known_set_Bacillus.xlsx", drop_wins=False)
     # self = lr
     # flc, ffc = lr.get_conf_mat(return_flag=True)
