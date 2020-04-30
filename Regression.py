@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 
+x = 3
 NT2AA_dict = {
         'ATA': 'I', 'ATC': 'I', 'ATT': 'I', 'ATG': 'M',
         'ACA': 'T', 'ACC': 'T', 'ACG': 'T', 'ACT': 'T',
