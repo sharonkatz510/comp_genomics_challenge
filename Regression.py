@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-# from pylab import *
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
+from scipy.stats import spearmanr
 
 
 NT2AA_dict = {
@@ -48,12 +48,14 @@ class LinReg:
         x = data.drop(columns=['PA', 'UTR5', 'ORF'])
         self.X = x.drop(columns='argenin frequnecy ')
         self.add_features()
+        # self.norm_data()
         if drop_wins: self.drop_windows()
 
         self.Y = data['PA']
 
     def add_features(self):
         self.add_aa_freq(['Arg_freq', 'Ala_freq', 'Gly_freq', 'Val_freq'], ['R', 'A', 'G', 'V'])
+        self.add_codon_freq()
         self.X['free_var'] = np.ones(len(self.X))
 
     def add_aa_freq(self, col_names, aas):
@@ -69,6 +71,11 @@ class LinReg:
         aas = self.str_seriesses['ORF'].apply(get_aa)
         return aas.apply(lambda x: x.count(wanted_aa) / len(x))
 
+    # TODO: add all relevant codons
+    def add_codon_freq(self):
+        pass
+
+    # TODO: <deprecate?>
     def get_conf_mat(self, plot_flag=False, return_flag=False):
         """
         :param plot_flag: plots if True
@@ -87,12 +94,14 @@ class LinReg:
             plt.colorbar(), plt.show()
         if return_flag: return feat_label_corr, feature_feature_corr
 
+    # TODO: <deprecate?>
     def drop_windows(self):
         """
         Remove "window" features if irrelevant
         """
         self.X = self.X.drop(columns=[name for name in self.X.columns if 'dow' in name])
 
+    # TODO: <deprecate?>
     def plot_col_num(self, col_num):
         """
         :param col_num:  data frame column number
@@ -102,15 +111,39 @@ class LinReg:
         plt.scatter(self.X[col], self.Y)
         plt.xlabel(col), plt.ylabel('PA')
 
-    def get_model(self):
+    def get_model(self, prtf=False, rf=False):
         """
         Train a linear regressor based on self data
+        :prtf is print_flag
+        :rf is return_flag
         """
+        # TODO: cross-validation (k-fold)
         x_train, x_test, y_train, y_test = train_test_split(self.X, self.Y, test_size=0.2)
-        reg = LinearRegression()
+
+        reg = LinearRegression(normalize=True)
         reg.fit(x_train, y_train)
-        print("R^2 for linear regression is:", reg.score(x_test, y_test))
-        return reg, reg.score(x_test, y_test)
+
+        y_pred = reg.predict(x_test)
+        print(spearmanr(y_pred, y_test))
+
+        if prtf:
+            print(f"R^2 for train data is:{reg.score(x_train, y_train)}")
+            print(f"R^2 for test data is:{reg.score(x_test, y_test)}")
+            print(f"spearman correlation score:{spearmanr(y_pred,y_test)}")
+
+        if rf: return reg, reg.score(x_test, y_test)
+
+    def coef(self, n=10, pltf=False):
+        """
+            work with model coefficients
+            :pltf is plot_flag
+        """
+        mdl, scr = self.get_model(rf=True) # prtf=True
+        abscoefs = abs(mdl.coef_)
+        if pltf: plt.plot(abscoefs)
+        sorted_idx = np.flip(abscoefs.argsort())
+        sorted_features = lr.X.columns[sorted_idx]
+        for i in range(n): print(f"feature name:{sorted_features[i]}, feature coeff:{abscoefs[sorted_idx][i]}")
 
 
 if __name__ == "__main__":
@@ -119,4 +152,4 @@ if __name__ == "__main__":
     # flc, ffc = lr.get_conf_mat(return_flag=True)
     # lr.get_conf_mat(plot_flag=True)
     # plt.figure(), plt.bar(range(len(flc)), flc), plt.xticks(range(len(flc)), list(lr.X.columns), size=7, rotation=45)
-    # lr.get_model()
+    lr.coef(n=1, pltf=False)
