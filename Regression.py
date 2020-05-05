@@ -26,15 +26,17 @@ NT2AA_dict = {
     }
 
 
+def get_codons(seq):
+    return [seq[i:i + 3] for i in range(0, int(len(seq)), 3)]
+
+
 def get_aa(seq):
     """"
     Get DNA sequence and transcribe to amino acids
     Stop codons are translated to a _ character
     """
     if len(seq) % 3 > 0: seq = seq[:-1 - (len(seq) % 3)]
-    # TODO: shouldn't transcription end if encountered stop codon?
-    #  --> stop codons are translated to a _ character, further processing should be done separately in my op.
-    codons = [seq[i:i + 3] for i in range(0, int(len(seq)), 3)]
+    codons = get_codons(seq)
     return "".join([NT2AA_dict[codon] for codon in codons])
 
 
@@ -54,11 +56,11 @@ class LinReg:
         self.Y = data['PA']
 
     def add_features(self):
-        self.add_aa_freq(['Arg_freq', 'Ala_freq', 'Gly_freq', 'Val_freq'], ['R', 'A', 'G', 'V'])
-        self.add_codon_freq()
+        self.add_aas_freq(['Arg_freq', 'Ala_freq', 'Gly_freq', 'Val_freq'], ['R', 'A', 'G', 'V'])
+        # self.add_codon_freq(NT2AA_dict.keys())
         self.X['free_var'] = np.ones(len(self.X))
 
-    def add_aa_freq(self, col_names, aas):
+    def add_aas_freq(self, col_names, aas):
         """"
         add AA frequencies to self.X
         """
@@ -71,9 +73,16 @@ class LinReg:
         aas = self.str_seriesses['ORF'].apply(get_aa)
         return aas.apply(lambda x: x.count(wanted_aa) / len(x))
 
-    # TODO: add all relevant codons
-    def add_codon_freq(self):
-        pass
+    def add_codon_freq(self, codons):
+        """
+        add the relative frequency of codons to self.X
+        :param codons: the codons to add freq of
+        """
+        for codon in codons: self.X[f"[cod]{codon}_freq"] = self.get_codon_freq(codon)
+
+    def get_codon_freq(self, wanted_codon):
+        seq = self.str_seriesses['ORF'].apply(get_codons)
+        return seq.apply(lambda x: x.count(wanted_codon)/len(x))
 
     # TODO: <deprecate?>
     def get_conf_mat(self, plot_flag=False, return_flag=False):
@@ -101,9 +110,9 @@ class LinReg:
         """
         self.X = self.X.drop(columns=[name for name in self.X.columns if 'dow' in name])
 
-    # TODO: <deprecate?>
     def plot_col_num(self, col_num):
         """
+        this method scatter plots the feature and label plot
         :param col_num:  data frame column number
         """
         col = self.X.iloc[:, col_num]
@@ -111,7 +120,7 @@ class LinReg:
         plt.scatter(self.X[col], self.Y)
         plt.xlabel(col), plt.ylabel('PA')
 
-    def get_model(self, prtf=False, rf=False):
+    def get_model(self, prtf=False, pltf=False, rf=False):
         """
         Train a linear regressor based on self data
         :prtf is print_flag
@@ -120,11 +129,20 @@ class LinReg:
         # TODO: cross-validation (k-fold)
         x_train, x_test, y_train, y_test = train_test_split(self.X, self.Y, test_size=0.2)
 
-        reg = LinearRegression(normalize=True)
+        reg = LinearRegression()
         reg.fit(x_train, y_train)
 
-        y_pred = reg.predict(x_test)
+        # TODO: fix model assesment
+        y_pred = pd.Series(reg.predict(x_test), index=y_test.index)
         print(spearmanr(y_pred, y_test))
+
+        # scatter plotting y_pred : y_test
+        if pltf:
+            plt.figure()
+            plt.scatter(range(len(y_pred)), y_pred, label="y_pred")
+            plt.scatter(range(len(y_test)), y_test, label="y_test")
+            plt.legend()
+            plt.show()
 
         if prtf:
             print(f"R^2 for train data is:{reg.score(x_train, y_train)}")
@@ -138,9 +156,9 @@ class LinReg:
             work with model coefficients
             :pltf is plot_flag
         """
-        mdl, scr = self.get_model(rf=True) # prtf=True
+        mdl, scr = self.get_model(rf=True, pltf=True)  # prtf=True
         abscoefs = abs(mdl.coef_)
-        if pltf: plt.plot(abscoefs)
+        if pltf: plt.figure(), plt.plot(abscoefs)
         sorted_idx = np.flip(abscoefs.argsort())
         sorted_features = lr.X.columns[sorted_idx]
         for i in range(n): print(f"feature name:{sorted_features[i]}, feature coeff:{abscoefs[sorted_idx][i]}")
@@ -152,4 +170,6 @@ if __name__ == "__main__":
     # flc, ffc = lr.get_conf_mat(return_flag=True)
     # lr.get_conf_mat(plot_flag=True)
     # plt.figure(), plt.bar(range(len(flc)), flc), plt.xticks(range(len(flc)), list(lr.X.columns), size=7, rotation=45)
-    lr.coef(n=1, pltf=False)
+    lr.coef(n=15, pltf=True)
+
+    # plt.imshow(lr.X[:-2].corr() - np.eye(len(lr.X.columns)))
