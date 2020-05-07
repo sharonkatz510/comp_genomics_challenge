@@ -42,19 +42,23 @@ class LinReg:
     """
     Gather data from file, extract additional features and labels, later use to train a linear regressor
     """
-    def __init__(self, filename, drop_wins=False):
-        data = pd.read_excel(filename, index_col='Gene index')
-        self.str_seriesses = data[['PA', 'UTR5', 'ORF']]
-        x = data.drop(columns=['PA', 'UTR5', 'ORF'])
-        self.X = x.drop(columns='argenin frequnecy ')
-        self.add_features()
-        if drop_wins: self.drop_windows()
+    def __init__(self, filename=None, drop_wins=False, data=None, label=None):
+        self.X = data
+        self.Y = label
+        if data is None:
+            data = pd.read_excel(filename, index_col='Gene index')
+            self.str_seriesses = data[['PA', 'UTR5', 'ORF']]
+            self.X = data.drop(columns=['PA', 'UTR5', 'ORF', 'argenin frequnecy '])
+            self.add_features()
+            self.Y = data['PA']
 
-        self.Y = data['PA']
+        if drop_wins: self.drop_windows()
 
     def add_features(self):
         self.add_aa_freq(['Arg_freq', 'Ala_freq', 'Gly_freq', 'Val_freq'], ['R', 'A', 'G', 'V'])
         self.X['free_var'] = np.ones(len(self.X))
+        self.X['avg_win'] = np.mean(self.X.iloc[:, 4:104], axis=1)
+        self.X['std_win'] = np.std(self.X.iloc[:, 4:104], axis=1)
 
     def add_aa_freq(self, col_names, aas):
         """"
@@ -78,9 +82,9 @@ class LinReg:
         truncated_conf_mat = np.abs(conf_mat.values - np.eye(conf_mat.shape[0]))
         feat_label_corr = truncated_conf_mat[-1, :]
         feature_feature_corr = truncated_conf_mat[0:-2, 0:-2]
-        print(f"\nMax Feature-Label Correlation: {np.max(truncated_conf_mat[-1, :])} \n")
+        print("\nMax Feature-Label Correlation: {0} \n".format(np.max(truncated_conf_mat[-1, :])))
         if plot_flag:
-            print(f"Feature-Label Correlation: \n{feat_label_corr} \n")
+            print("Feature-Label Correlation: \n{0} \n".format(feat_label_corr))
             plt.imshow(truncated_conf_mat, interpolation='nearest', )
             plt.xticks(np.arange(conf_mat.shape[0]), conf_mat.columns, size=7, rotation=45)
             plt.yticks(np.arange(conf_mat.shape[0]), conf_mat.columns, size=7, rotation=45)
@@ -114,7 +118,12 @@ class LinReg:
 
 
 if __name__ == "__main__":
+    from feature_selection import *
+    from math import sqrt
     lr = LinReg("Known_set_Bacillus.xlsx", drop_wins=False)
+    best_features = ffs(round(sqrt(len(lr.X))), lr.X, lr.Y)
+    only_best = LinReg(data=lr.X[list(best_features)], label=lr.Y)
+    mdl, mdl_score = only_best.get_model()
     # self = lr
     # flc, ffc = lr.get_conf_mat(return_flag=True)
     # lr.get_conf_mat(plot_flag=True)
