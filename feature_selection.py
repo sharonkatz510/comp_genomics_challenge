@@ -11,9 +11,15 @@ def spear_corr(x, y):
     return X.corr(Y, method="spearman")
 
 
-def ffs(k: "number of features", data: "pandas DataFrame", label, fn: "Feature evaluation function" = spear_corr):
-    """This function implements ffs using multi-feature regression and evaluation
-    function fn"""
+def ffs(k, data, label, fn=spear_corr):
+    """
+    This function implements ffs using multi-feature regression and evaluation
+    function fn
+    k: number of features,
+    data: pandas DataFrame,
+    label: pandas series
+    fn: Feature evaluation function
+    """
     data["free_var"] = np.ones(len(data))
     x_train, x_test, y_train, y_test = train_test_split(data, label, test_size=0.2)
     best_features = 'free_var',
