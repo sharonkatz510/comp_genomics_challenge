@@ -25,6 +25,6 @@ def ffs(k: "number of features", data: "pandas DataFrame", label, fn: "Feature e
             feature_list.append(feature_name)
             feature_comb = x_train[feature_list]
             reg = LinearRegression().fit(feature_comb, y_train)
-            feature_scores[feature_name] = spear_corr(reg.predict(x_test[feature_list]), y_test)
+            feature_scores[feature_name] = fn(reg.predict(x_test[feature_list]), y_test)
         best_features = best_features + (max(feature_scores, key=feature_scores.get),)
     return best_features

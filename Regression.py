@@ -21,23 +21,45 @@ NT2AA_dict = {
         'GGA': 'G', 'GGC': 'G', 'GGG': 'G', 'GGT': 'G',
         'TCA': 'S', 'TCC': 'S', 'TCG': 'S', 'TCT': 'S',
         'TTC': 'F', 'TTT': 'F', 'TTA': 'L', 'TTG': 'L',
-        'TAC': 'Y', 'TAT': 'Y', 'TAA': '_', 'TAG': '_',
-        'TGC': 'C', 'TGT': 'C', 'TGA': '_', 'TGG': 'W',
+        'TAC': 'Y', 'TAT': 'Y', 'TAA': None, 'TAG': None,
+        'TGC': 'C', 'TGT': 'C', 'TGA': None, 'TGG': 'W',
     }
-
-
-def get_codons(seq):
-    return [seq[i:i + 3] for i in range(0, int(len(seq)), 3)]
 
 
 def get_aa(seq):
     """"
     Get DNA sequence and transcribe to amino acids
-    Stop codons are translated to a _ character
     """
-    if len(seq) % 3 > 0: seq = seq[:-1 - (len(seq) % 3)]
-    codons = get_codons(seq)
-    return "".join([NT2AA_dict[codon] for codon in codons])
+    start = seq.index('ATG')    # seek start codon
+    if len(seq[start:]) % 3 > 0:
+        seq = seq[start:-1 - (len(seq[start:]) % 3)]
+    codons = [seq[i:i + 3] for i in range(0, int(len(seq)), 3)] #split string to list of 3 letter codons
+    aas = [NT2AA_dict.get(codon) for codon in codons] # translate
+    if None in aas: # seek end codon
+        return "".join(aas[:aas.index(None)])
+    else:
+        return "".join(aas)
+
+
+def get_aa_freq(series, wanted_aa):
+    """
+    returns the input AA's frequency
+    """
+    aas = series.apply(get_aa)
+    return aas.apply(lambda x: len(x) and x.count(wanted_aa) / len(x))
+
+
+def add_aas_freq(data, col_names, aas):
+    """"
+    return AA frequencies in data
+    """
+    x = pd.DataFrame(columns = col_names)
+    for cn, aa in zip(col_names, aas): x[cn] = get_aa_freq(data,aa)
+    return x
+
+
+def get_nuc_freq(wanted_nuc, data):
+        return data.apply(lambda x: len(x) and x.count(wanted_nuc)/len(x))
 
 
 class LinReg:
@@ -54,38 +76,20 @@ class LinReg:
             self.add_features()
             self.Y = data['PA']
 
+        self.normalized_Y = self.Y.apply(lambda x: ((x - min(self.Y)) / (max(self.Y) - min(self.Y))) ** 0.1)
         if drop_wins: self.drop_windows()
 
     def add_features(self):
-        self.add_aas_freq(['Arg_freq', 'Ala_freq', 'Gly_freq', 'Val_freq'], ['R', 'A', 'G', 'V'])
-        # self.add_codon_freq(NT2AA_dict.keys())
+        orf_cols = ['orf_Arg_freq', 'orf_Ala_freq', 'orf_Gly_freq', 'orf_Val_freq']
+        orf_aa_freqs = add_aas_freq(self.str_seriesses['ORF'], orf_cols, ['R', 'A', 'G', 'V'])
+        self.X = pd.concat([self.X, orf_aa_freqs], axis=1)
         self.X['free_var'] = np.ones(len(self.X))
         self.X['avg_win'] = np.mean(self.X.iloc[:, 4:104], axis=1)
         self.X['std_win'] = np.std(self.X.iloc[:, 4:104], axis=1)
-
-    def add_aas_freq(self, col_names, aas):
-        """"
-        add AA frequencies to self.X
-        """
-        for cn, aa in zip(col_names, aas): self.X[cn] = self.get_aa_freq(aa)
-
-    def get_aa_freq(self, wanted_aa):
-        """
-        returns the input AA's frequency
-        """
-        aas = self.str_seriesses['ORF'].apply(get_aa)
-        return aas.apply(lambda x: x.count(wanted_aa) / len(x))
-
-    def add_codon_freq(self, codons):
-        """
-        add the relative frequency of codons to self.X
-        :param codons: the codons to add freq of
-        """
-        for codon in codons: self.X[f"[cod]{codon}_freq"] = self.get_codon_freq(codon)
-
-    def get_codon_freq(self, wanted_codon):
-        seq = self.str_seriesses['ORF'].apply(get_codons)
-        return seq.apply(lambda x: x.count(wanted_codon)/len(x))
+        for nuc in ['A', 'T', 'G', 'C'] : self.X["utr_{0}_freq".format(nuc)] = get_nuc_freq(nuc,
+                                                                                            self.str_seriesses['UTR5'])
+        for nuc in ['A', 'T', 'G', 'C'] : self.X["orf_{0}_freq".format(nuc)] = get_nuc_freq(nuc,
+                                                                                            self.str_seriesses['ORF'])
 
     # TODO: <deprecate?>
     def get_conf_mat(self, plot_flag=False, return_flag=False):
@@ -123,14 +127,14 @@ class LinReg:
         plt.scatter(self.X[col], self.Y)
         plt.xlabel(col), plt.ylabel('PA')
 
-    def get_model(self, prtf=False, pltf=False, rf=False):
+    def get_model(self, prtf=False, pltf=False):
         """
         Train a linear regressor based on self data
         :prtf is print_flag
         :rf is return_flag
         """
         # TODO: cross-validation (k-fold)
-        x_train, x_test, y_train, y_test = train_test_split(self.X, self.Y, test_size=0.2)
+        x_train, x_test, y_train, y_test = train_test_split(self.X, self.normalized_Y, test_size=0.2)
         reg = LinearRegression()
         reg.fit(x_train, y_train)
 
@@ -141,36 +145,44 @@ class LinReg:
         # scatter plotting y_pred : y_test
         if pltf:
             plt.figure()
-            plt.scatter(range(len(y_pred)), y_pred, label="y_pred")
-            plt.scatter(range(len(y_test)), y_test, label="y_test")
+            y_pred_reind = y_pred.copy()
+            y_test_reind = y_test.copy()
+            y_pred_reind.index = range(len(y_pred))
+            y_test_reind.index = range(len(y_test))
+            asc_ind = y_test_reind.sort_values().index
+            plt.scatter(range(len(y_pred)),y_pred_reind.iloc[asc_ind], label="y_pred")
+            plt.scatter(range(len(y_test)), y_test_reind.iloc[asc_ind], label="y_test")
+            plt.xticks(asc_ind)
             plt.legend()
             plt.show()
 
         if prtf:
-            print(f"R^2 for train data is:{reg.score(x_train, y_train)}")
-            print(f"R^2 for test data is:{reg.score(x_test, y_test)}")
-            print(f"spearman correlation score:{spearmanr(y_pred,y_test)}")
+            print("R^2 for train data is:{0}".format(reg.score(x_train, y_train)))
+            print("R^2 for test data is:{0}".format(reg.score(x_test, y_test)))
+            print("Spearman correlation score:{0}".format(spearmanr(y_pred,y_test)))
 
-        if rf: return reg, reg.score(x_test, y_test)
+        return reg, reg.score(x_test, y_test)
 
     def coef(self, n=10, pltf=False):
         """
             work with model coefficients
             :pltf is plot_flag
         """
-        mdl, scr = self.get_model(rf=True, pltf=True)  # prtf=True
+        mdl, scr = self.get_model(pltf=True)  # prtf=True
         abscoefs = abs(mdl.coef_)
-        if pltf: plt.figure(), plt.plot(abscoefs)
+        if pltf:
+            plt.figure(), plt.plot(abscoefs)
         sorted_idx = np.flip(abscoefs.argsort())
         sorted_features = lr.X.columns[sorted_idx]
-        for i in range(n): print(f"feature name:{sorted_features[i]}, feature coeff:{abscoefs[sorted_idx][i]}")
+        for i in range(n):
+            print("feature name:{0}, feature coeff:{1}".format(sorted_features[i], abscoefs[sorted_idx][i]))
 
 
 if __name__ == "__main__":
     from feature_selection import *
     from math import sqrt
     lr = LinReg("Known_set_Bacillus.xlsx", drop_wins=False)
-    best_features = ffs(round(sqrt(len(lr.X))), lr.X, lr.Y)
+    best_features = ffs(round(sqrt(len(lr.X))), lr.X, lr.normalized_Y)
     only_best = LinReg(data=lr.X[list(best_features)], label=lr.Y)
     mdl, mdl_score = only_best.get_model()
     # self = lr
