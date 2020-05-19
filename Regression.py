@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn import preprocessing
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from scipy.stats import spearmanr
@@ -21,9 +22,13 @@ NT2AA_dict = {
         'GGA': 'G', 'GGC': 'G', 'GGG': 'G', 'GGT': 'G',
         'TCA': 'S', 'TCC': 'S', 'TCG': 'S', 'TCT': 'S',
         'TTC': 'F', 'TTT': 'F', 'TTA': 'L', 'TTG': 'L',
-        'TAC': 'Y', 'TAT': 'Y', 'TAA': None, 'TAG': None,
-        'TGC': 'C', 'TGT': 'C', 'TGA': None, 'TGG': 'W',
+        'TAC': 'Y', 'TAT': 'Y', 'TAA': '_', 'TAG': '_',
+        'TGC': 'C', 'TGT': 'C', 'TGA': '_', 'TGG': 'W',
     }
+
+
+def get_codons(seq):
+    return [seq[i:i + 3] for i in range(0, int(len(seq)), 3)]
 
 
 def get_aa(seq):
@@ -184,11 +189,13 @@ if __name__ == "__main__":
     lr = LinReg("Known_set_Bacillus.xlsx", drop_wins=False)
     best_features = ffs(round(sqrt(len(lr.X))), lr.X, lr.normalized_Y)
     only_best = LinReg(data=lr.X[list(best_features)], label=lr.Y)
-    mdl, mdl_score = only_best.get_model()
+    mdl, mdl_score = only_best.get_model(rf=True, pltf=True)
+    only_best.coef(n=15, pltf=True)
+
+    # lr.coef(n=15, pltf=True)
     # self = lr
+
+    # plt.imshow(lr.X[:-2].corr() - np.eye(len(lr.X.columns)))
     # flc, ffc = lr.get_conf_mat(return_flag=True)
     # lr.get_conf_mat(plot_flag=True)
     # plt.figure(), plt.bar(range(len(flc)), flc), plt.xticks(range(len(flc)), list(lr.X.columns), size=7, rotation=45)
-    lr.coef(n=15, pltf=True)
-
-    # plt.imshow(lr.X[:-2].corr() - np.eye(len(lr.X.columns)))
