@@ -22,10 +22,10 @@ NT2AA_dict = {
         'GGA': 'G', 'GGC': 'G', 'GGG': 'G', 'GGT': 'G',
         'TCA': 'S', 'TCC': 'S', 'TCG': 'S', 'TCT': 'S',
         'TTC': 'F', 'TTT': 'F', 'TTA': 'L', 'TTG': 'L',
-        'TAC': 'Y', 'TAT': 'Y', 'TAA': '_', 'TAG': '_',
-        'TGC': 'C', 'TGT': 'C', 'TGA': '_', 'TGG': 'W',
+        'TAC': 'Y', 'TAT': 'Y', 'TAA': None, 'TAG': None,
+        'TGC': 'C', 'TGT': 'C', 'TGA': None, 'TGG': 'W',
     }
-
+AAs = list(set(x for x in NT2AA_dict.values() if x is not None))
 
 def get_codons(seq):
     return [seq[i:i + 3] for i in range(0, int(len(seq)), 3)]
@@ -67,6 +67,17 @@ def get_nuc_freq(wanted_nuc, data):
         return data.apply(lambda x: len(x) and x.count(wanted_nuc)/len(x))
 
 
+def get_CpG_content(sequence: str):
+    """Get relative amount of GC in sequence"""
+    x = pd.Series(list(sequence))
+    g = x == 'G'
+    c = x == 'C'
+    g = g.values.astype(int)
+    c = c.values.astype(int)
+    ind = 3*g[:-1]-c[1:]
+    return sum(ind == 2)/float(len(ind))
+
+
 class LinReg:
     """
     Gather data from file, extract additional features and labels, later use to train a linear regressor
@@ -85,12 +96,14 @@ class LinReg:
         if drop_wins: self.drop_windows()
 
     def add_features(self):
-        orf_cols = ['orf_Arg_freq', 'orf_Ala_freq', 'orf_Gly_freq', 'orf_Val_freq']
-        orf_aa_freqs = add_aas_freq(self.str_seriesses['ORF'], orf_cols, ['R', 'A', 'G', 'V'])
+        orf_cols = ['{0}_freq'.format(x) for x in AAs]
+        orf_aa_freqs = add_aas_freq(self.str_seriesses['ORF'], orf_cols,AAs)
         self.X = pd.concat([self.X, orf_aa_freqs], axis=1)
         self.X['free_var'] = np.ones(len(self.X))
         self.X['avg_win'] = np.mean(self.X.iloc[:, 4:104], axis=1)
         self.X['std_win'] = np.std(self.X.iloc[:, 4:104], axis=1)
+        self.X['orf_CpG_content'] = self.str_seriesses['ORF'].apply(get_CpG_content)
+        self.X['utr_CpG_content'] = self.str_seriesses['UTR5'].apply(get_CpG_content)
         for nuc in ['A', 'T', 'G', 'C'] : self.X["utr_{0}_freq".format(nuc)] = get_nuc_freq(nuc,
                                                                                             self.str_seriesses['UTR5'])
         for nuc in ['A', 'T', 'G', 'C'] : self.X["orf_{0}_freq".format(nuc)] = get_nuc_freq(nuc,
@@ -189,7 +202,7 @@ if __name__ == "__main__":
     lr = LinReg("Known_set_Bacillus.xlsx", drop_wins=False)
     best_features = ffs(round(sqrt(len(lr.X))), lr.X, lr.normalized_Y)
     only_best = LinReg(data=lr.X[list(best_features)], label=lr.Y)
-    mdl, mdl_score = only_best.get_model(rf=True, pltf=True)
+    mdl, mdl_score = only_best.get_model(pltf=True)
     only_best.coef(n=15, pltf=True)
 
     # lr.coef(n=15, pltf=True)
