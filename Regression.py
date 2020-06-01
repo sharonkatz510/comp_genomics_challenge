@@ -167,6 +167,7 @@ class LinReg:
             plt.scatter(range(len(y_test)), y_test_reind.iloc[asc_ind], label="y_test")
             plt.xticks(asc_ind)
             plt.legend()
+            plt.title('Test PA')
             plt.show()
 
         if prtf:
@@ -183,8 +184,12 @@ class LinReg:
         """
         mdl, scr = self.get_model(pltf=True)  # prtf=True
         abscoefs = abs(mdl.coef_)
+        if len(mdl.coef_)<n:
+            n = len(mdl.coef_)-1
         if pltf:
-            plt.figure(), plt.plot(abscoefs)
+            plt.figure(), plt.bar(np.arange(len(abscoefs)).ravel(), abscoefs)
+            plt.title('Regression coefficients values')
+            plt.xticks(range(len(self.X.columns)), self.X.columns)
         sorted_idx = np.flip(abscoefs.argsort())
         sorted_features = lr.X.columns[sorted_idx]
         for i in range(n):
