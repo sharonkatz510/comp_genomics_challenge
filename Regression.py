@@ -69,13 +69,7 @@ def get_nuc_freq(wanted_nuc, data):
 
 def get_CpG_content(sequence: str):
     """Get relative amount of GC in sequence"""
-    x = pd.Series(list(sequence))
-    g = x == 'G'
-    c = x == 'C'
-    g = g.values.astype(int)
-    c = c.values.astype(int)
-    ind = 3*g[:-1]-c[1:]
-    return sum(ind == 2)/float(len(ind))
+    return sequence.count('GC')/float(len(sequence))
 
 
 class LinReg:
@@ -104,6 +98,7 @@ class LinReg:
         self.X['std_win'] = np.std(self.X.iloc[:, 4:104], axis=1)
         self.X['orf_CpG_content'] = self.str_seriesses['ORF'].apply(get_CpG_content)
         self.X['utr_CpG_content'] = self.str_seriesses['UTR5'].apply(get_CpG_content)
+        self.X['TATA_boxes'] = self.str_seriesses['UTR5'].apply(lambda x: x.count('TATAAT'))
         for nuc in ['A', 'T', 'G', 'C'] : self.X["utr_{0}_freq".format(nuc)] = get_nuc_freq(nuc,
                                                                                             self.str_seriesses['UTR5'])
         for nuc in ['A', 'T', 'G', 'C'] : self.X["orf_{0}_freq".format(nuc)] = get_nuc_freq(nuc,
@@ -152,7 +147,7 @@ class LinReg:
         :rf is return_flag
         """
         # TODO: cross-validation (k-fold)
-        x_train, x_test, y_train, y_test = train_test_split(self.X, self.normalized_Y, test_size=0.2)
+        x_train, x_test, y_train, y_test = train_test_split(self.X, self.normalized_Y, test_size=0.4)
         reg = LinearRegression()
         reg.fit(x_train, y_train)
 
