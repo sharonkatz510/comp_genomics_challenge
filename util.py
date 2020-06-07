@@ -22,6 +22,7 @@ NT2AA_dict = {
     'TGC': 'C', 'TGT': 'C', 'TGA': '_', 'TGG': 'W',
 }
 
+
 def get_codons(seq):
     return [seq[i:i + 3] for i in range(0, int(len(seq)), 3)]
 
