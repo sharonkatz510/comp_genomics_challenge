@@ -1,10 +1,5 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn import preprocessing
-from sklearn.linear_model import LinearRegression
-from sklearn.linear_model import ElasticNet
-from sklearn.model_selection import train_test_split
+from feature_selection import *
+from sklearn.utils import Bunch
 from scipy.stats import spearmanr
 
 
@@ -13,7 +8,7 @@ class LinReg:
     Gather data from file, extract additional features and labels, later use to train a linear regressor
     """
 
-    def __init__(self, filename=None, drop_wins=False, data=None, label=None):
+    def __init__(self, filename=None, drop_wins=False, data=None, label=None, train_test_data=None):
         self.X = data
         self.Y = label
         if data is None:
@@ -25,6 +20,7 @@ class LinReg:
 
         self.normalized_Y = self.Y.apply(lambda x: ((x - min(self.Y)) / (max(self.Y) - min(self.Y))) ** 0.1)
         if drop_wins: self.X = self.X.drop(columns=[name for name in self.X.columns if 'dow' in name])
+        [self.model, self.train_test_data] = self.get_model(train_test_data)
 
     def add_features(self):
         orf_cols = ['orf_Arg_freq', 'orf_Ala_freq', 'orf_Gly_freq', 'orf_Val_freq']
@@ -48,67 +44,98 @@ class LinReg:
         plt.scatter(self.X[col], self.Y)
         plt.xlabel(col), plt.ylabel('PA')
 
-    def get_model(self, prtf=False, pltf=False):
+    def get_model(self, data=None):
         """
-        Train a linear regressor based on self data
-        :prtf is print_flag
-        :rf is return_flag
+        Train a linear regressor based on inside or outside data and return model and data split
         """
         # TODO: cross-validation (k-fold)
-        x_train, x_test, y_train, y_test = train_test_split(self.X, self.normalized_Y, test_size=0.2)
+        if not data:
+            data = Bunch()
+            data.x_train, data.x_test, data.y_train, data.y_test = train_test_split(self.X, self.Y, test_size=0.1)
         reg = LinearRegression()
-        # reg = ElasticNet()
-        reg.fit(x_train, y_train)
+        reg.fit(data.x_train, data.y_train)
+        return reg, data
 
-        # TODO: fix model assesment
-        y_pred = pd.Series(reg.predict(x_test), index=y_test.index)
-        print(spearmanr(y_pred, y_test))
-
-        # scatter plotting y_pred : y_test
-        if pltf:
-            plt.figure()
-            y_pred_reind = y_pred.copy()
-            y_test_reind = y_test.copy()
-            y_pred_reind.index = range(len(y_pred))
-            y_test_reind.index = range(len(y_test))
-            asc_ind = y_test_reind.sort_values().index
-            plt.scatter(range(len(y_pred)), y_pred_reind.iloc[asc_ind], label="y_pred")
-            plt.scatter(range(len(y_test)), y_test_reind.iloc[asc_ind], label="y_test")
-            plt.xticks(asc_ind)
-            plt.legend()
-            plt.show()
-
-        if prtf:
-            print("R^2 for train data is:{0}".format(reg.score(x_train, y_train)))
-            print("R^2 for test data is:{0}".format(reg.score(x_test, y_test)))
-            print("Spearman correlation score:{0}".format(spearmanr(y_pred, y_test)))
-
-        return reg, reg.score(x_test, y_test)
-
-    def coef(self, n=10, pltf=False):
+    def asses_model(self, data=None, Training=False):
         """
-            work with model coefficients
+        Asses model performance and print results
+        Training = use training data instead of test data
+        """
+        reg = self.model
+        x_test = self.train_test_data.x_test
+        y_test = self.train_test_data.y_test
+        if Training:
+            x_test = self.train_test_data.x_train
+            y_test = self.train_test_data.y_train
+        if data:
+            x_test = data.x
+            y_test = data.y
+        y_pred = pd.Series(reg.predict(x_test), index=y_test.index)
+        print("R^2 for data is:{0}".format(reg.score(x_test, y_test)))
+        print("Spearman correlation score:{0}".format(spearmanr(y_pred, y_test)))
+
+    def visualize_model_performance(self, data=None):
+        """Plot model prediction vs label"""
+        x_test = self.train_test_data.x_test
+        y_test = self.train_test_data.y_test
+        if data:  # Allows performance comparison between models on same dataset
+            x_test = data.x
+            y_test = data.y
+        y_pred = pd.Series(self.model.predict(x_test), index=y_test.index)
+        plt.figure()
+        y_pred_reind = y_pred.copy()
+        y_test_reind = y_test.copy()
+        y_pred_reind.index = range(len(y_pred))
+        y_test_reind.index = range(len(y_test))
+        asc_ind = y_test_reind.sort_values().index
+        plt.scatter(range(len(y_pred)), y_pred_reind.iloc[asc_ind], label="y_pred")
+        plt.scatter(range(len(y_test)), y_test_reind.iloc[asc_ind], label="y_test")
+        plt.xticks(asc_ind)
+        plt.legend()
+        plt.title('Test PA')
+        plt.show()
+
+    def get_coefs(self, n=10, pltf=False):
+        """
+            return n primary model coefficients
             :pltf is plot_flag
         """
-        mdl, scr = self.get_model(pltf=True)  # prtf=True
+        mdl = self.model
         abscoefs = abs(mdl.coef_)
+        if len(mdl.coef_) < n:
+            n = len(mdl.coef_) - 1
         if pltf:
-            plt.figure(), plt.plot(abscoefs)
+            plt.figure(), plt.bar(np.arange(len(abscoefs)).ravel(), abscoefs)
+            plt.title('Regression coefficients values')
+            plt.xticks(range(len(self.X.columns)), self.X.columns)
         sorted_idx = np.flip(abscoefs.argsort())
         sorted_features = lr.X.columns[sorted_idx]
+
         for i in range(n):
             print("feature name:{0}, feature coeff:{1}".format(sorted_features[i], abscoefs[sorted_idx][i]))
 
 
 if __name__ == "__main__":
-    from feature_selection import *
-    from math import sqrt
-
     lr = LinReg("Known_set_Bacillus.xlsx", drop_wins=False)
+    best_features = ffs(round(len(lr.X)**0.5), lr.X, lr.Y)
 
-    best_features = ffs(round(sqrt(len(lr.X))), lr.X, lr.normalized_Y)
-    only_best = LinReg(data=lr.X[list(best_features)], label=lr.Y)
+    # This part is ugly but not sure how to solve this 'cause pandas are fucking mutable TODO: find better solution
+    best_data = Bunch()
+    best_data.x_train = lr.train_test_data.x_train[list(best_features)].copy()
+    best_data.x_test = lr.train_test_data.x_test[list(best_features)].copy()
+    best_data.y_train = lr.train_test_data.y_train.copy()
+    best_data.y_test = lr.train_test_data.y_test.copy()
+    # End of ugly part
 
-    mdl, mdl_score = only_best.get_model(pltf=True)
-    only_best.coef(n=15, pltf=True)
-
+    only_best = LinReg(data=lr.X[list(best_features)], label=lr.Y, train_test_data=best_data)
+    only_best.visualize_model_performance()
+    print('***All features results***')
+    print('--training results--')
+    lr.asses_model(Training=True)
+    print('--test results--')
+    lr.asses_model()
+    print('***Only best features results***')
+    print('--training results--')
+    only_best.asses_model(Training=True)
+    print('--test results--')
+    only_best.asses_model()
