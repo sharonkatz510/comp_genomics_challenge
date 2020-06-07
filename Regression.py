@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn import preprocessing
 from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import ElasticNet
 from sklearn.model_selection import train_test_split
 from scipy.stats import spearmanr
 
@@ -23,7 +24,7 @@ class LinReg:
             self.Y = data['PA']
 
         self.normalized_Y = self.Y.apply(lambda x: ((x - min(self.Y)) / (max(self.Y) - min(self.Y))) ** 0.1)
-        if drop_wins: self.drop_windows()
+        if drop_wins: self.X = self.X.drop(columns=[name for name in self.X.columns if 'dow' in name])
 
     def add_features(self):
         orf_cols = ['orf_Arg_freq', 'orf_Ala_freq', 'orf_Gly_freq', 'orf_Val_freq']
@@ -36,32 +37,6 @@ class LinReg:
                                                                                            self.str_seriesses['UTR5'])
         for nuc in ['A', 'T', 'G', 'C']: self.X["orf_{0}_freq".format(nuc)] = get_nuc_freq(nuc,
                                                                                            self.str_seriesses['ORF'])
-
-    # TODO: <deprecate?>
-    def get_conf_mat(self, plot_flag=False, return_flag=False):
-        """
-        :param plot_flag: plots if True
-        :param return_flag: returns feat-feat and feat-label correlation mat\vec if True
-        """
-        conf_mat = pd.concat([self.X.drop(columns='free_var'), self.Y], axis=1).corr(method='spearman')
-        truncated_conf_mat = np.abs(conf_mat.values - np.eye(conf_mat.shape[0]))
-        feat_label_corr = truncated_conf_mat[-1, :]
-        feature_feature_corr = truncated_conf_mat[0:-2, 0:-2]
-        print("\nMax Feature-Label Correlation: {0} \n".format(np.max(truncated_conf_mat[-1, :])))
-        if plot_flag:
-            print("Feature-Label Correlation: \n{0} \n".format(feat_label_corr))
-            plt.imshow(truncated_conf_mat, interpolation='nearest', )
-            plt.xticks(np.arange(conf_mat.shape[0]), conf_mat.columns, size=7, rotation=45)
-            plt.yticks(np.arange(conf_mat.shape[0]), conf_mat.columns, size=7, rotation=45)
-            plt.colorbar(), plt.show()
-        if return_flag: return feat_label_corr, feature_feature_corr
-
-    # TODO: <deprecate?>
-    def drop_windows(self):
-        """
-        Remove "window" features if irrelevant
-        """
-        self.X = self.X.drop(columns=[name for name in self.X.columns if 'dow' in name])
 
     def plot_col_num(self, col_num):
         """
@@ -82,6 +57,7 @@ class LinReg:
         # TODO: cross-validation (k-fold)
         x_train, x_test, y_train, y_test = train_test_split(self.X, self.normalized_Y, test_size=0.2)
         reg = LinearRegression()
+        # reg = ElasticNet()
         reg.fit(x_train, y_train)
 
         # TODO: fix model assesment
@@ -129,15 +105,10 @@ if __name__ == "__main__":
     from math import sqrt
 
     lr = LinReg("Known_set_Bacillus.xlsx", drop_wins=False)
+
     best_features = ffs(round(sqrt(len(lr.X))), lr.X, lr.normalized_Y)
     only_best = LinReg(data=lr.X[list(best_features)], label=lr.Y)
+
     mdl, mdl_score = only_best.get_model(pltf=True)
     only_best.coef(n=15, pltf=True)
 
-    # lr.coef(n=15, pltf=True)
-    # self = lr
-
-    # plt.imshow(lr.X[:-2].corr() - np.eye(len(lr.X.columns)))
-    # flc, ffc = lr.get_conf_mat(return_flag=True)
-    # lr.get_conf_mat(plot_flag=True)
-    # plt.figure(), plt.bar(range(len(flc)), flc), plt.xticks(range(len(flc)), list(lr.X.columns), size=7, rotation=45)
