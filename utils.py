@@ -1,4 +1,4 @@
-# This module takes care of feature selection
+# This module takes care of all utility functions
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -83,6 +83,21 @@ def get_conf_mat(X, Y, plot_flag=False, return_flag=False):
         plt.yticks(np.arange(conf_mat.shape[0]), conf_mat.columns, size=7, rotation=45)
         plt.colorbar(), plt.show()
     if return_flag: return feat_label_corr, feature_feature_corr
+
+
+@np.vectorize
+def get_tata_loc(x: str):
+    """ Return distance of tata-box from string end or -1 if no tata box"""
+    if x.find('TATA') == -1:
+        return -1
+    else:
+        return len(x) - x.find('TATA')
+
+
+@np.vectorize
+def gc_count(x: str):
+    """Return length of longest gc"""
+    return x.count('GC')
 
 
 def spear_corr(x, y):

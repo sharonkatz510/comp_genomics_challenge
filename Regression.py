@@ -1,4 +1,4 @@
-from feature_selection import *
+from utils import *
 from sklearn.utils import Bunch
 from scipy.stats import spearmanr
 
@@ -8,19 +8,24 @@ class LinReg:
     Gather data from file, extract additional features and labels, later use to train a linear regressor
     """
 
-    def __init__(self, filename=None, drop_wins=False, data=None, label=None, train_test_data=None):
+    def __init__(self, **kwargs):
+        filename = kwargs.get('filename', None)
+        drop_wins = kwargs.get('drop_wins', False)
+        data = kwargs.get('data', None)
+        label = kwargs.get('label', None)
+
         self.X = data
         self.Y = label
         if data is None:
-            data = pd.read_excel(filename, index_col='Gene index')
-            self.str_seriesses = data[['PA', 'UTR5', 'ORF']]
-            self.X = data.drop(columns=['PA', 'UTR5', 'ORF', 'argenin frequnecy '])
+            tmp_data = pd.read_excel(filename, index_col='Gene index')
+            self.str_seriesses = tmp_data[['PA', 'UTR5', 'ORF']]
+            self.X = tmp_data.drop(columns=['PA', 'UTR5', 'ORF', 'argenin frequnecy '])
             self.add_features()
-            self.Y = data['PA']
+            self.Y = tmp_data['PA']
 
         self.normalized_Y = self.Y.apply(lambda x: ((x - min(self.Y)) / (max(self.Y) - min(self.Y))) ** 0.1)
         if drop_wins: self.X = self.X.drop(columns=[name for name in self.X.columns if 'dow' in name])
-        [self.model, self.train_test_data] = self.get_model(train_test_data)
+        [self.model, self.train_test_data] = self.get_model(**kwargs)
 
     def add_features(self):
         orf_cols = ['orf_Arg_freq', 'orf_Ala_freq', 'orf_Gly_freq', 'orf_Val_freq']
@@ -29,6 +34,8 @@ class LinReg:
         self.X['free_var'] = np.ones(len(self.X))
         self.X['avg_win'] = np.mean(self.X.iloc[:, 4:104], axis=1)
         self.X['std_win'] = np.std(self.X.iloc[:, 4:104], axis=1)
+        self.X['TATA_loc'] = self.str_seriesses['UTR5'].apply(get_tata_loc)
+        self.X['GC_count'] = self.str_seriesses['UTR5'].apply(gc_count)
         for nuc in ['A', 'T', 'G', 'C']: self.X["utr_{0}_freq".format(nuc)] = get_nuc_freq(nuc,
                                                                                            self.str_seriesses['UTR5'])
         for nuc in ['A', 'T', 'G', 'C']: self.X["orf_{0}_freq".format(nuc)] = get_nuc_freq(nuc,
@@ -44,19 +51,25 @@ class LinReg:
         plt.scatter(self.X[col], self.Y)
         plt.xlabel(col), plt.ylabel('PA')
 
-    def get_model(self, data=None):
+    def get_model(self, **kwargs):
         """
         Train a linear regressor based on inside or outside data and return model and data split
         """
         # TODO: cross-validation (k-fold)
-        if not data:
-            data = Bunch()
-            data.x_train, data.x_test, data.y_train, data.y_test = train_test_split(self.X, self.Y, test_size=0.1)
+        train_test_data = kwargs.get('train_test_data', None)
+        test_size = kwargs.get('test_size', 0.3)
+        normalize = kwargs.get('normalize', False)
+        if train_test_data is None:
+            train_test_data = Bunch()
+            y = self.normalized_Y if normalize else self.Y
+            train_test_data.x_train, train_test_data.x_test, \
+            train_test_data.y_train, train_test_data.y_test = \
+                train_test_split(self.X, y, test_size=test_size)
         reg = LinearRegression()
-        reg.fit(data.x_train, data.y_train)
-        return reg, data
+        reg.fit(train_test_data.x_train, train_test_data.y_train)
+        return reg, train_test_data
 
-    def asses_model(self, data=None, Training=False):
+    def asses_model(self, data=None, Training=False,prtf = True):
         """
         Asses model performance and print results
         Training = use training data instead of test data
@@ -71,8 +84,10 @@ class LinReg:
             x_test = data.x
             y_test = data.y
         y_pred = pd.Series(reg.predict(x_test), index=y_test.index)
-        print("R^2 for data is:{0}".format(reg.score(x_test, y_test)))
-        print("Spearman correlation score:{0}".format(spearmanr(y_pred, y_test)))
+        if prtf:
+            print("R^2 for data is:{0}".format(reg.score(x_test, y_test)))
+            print(spearmanr(y_pred, y_test))
+        return spearmanr(y_pred, y_test)
 
     def visualize_model_performance(self, data=None):
         """Plot model prediction vs label"""
@@ -95,7 +110,7 @@ class LinReg:
         plt.title('Test PA')
         plt.show()
 
-    def get_coefs(self, n=10, pltf=False):
+    def get_coefs(self, n=10, pltf=False, prtf = True):
         """
             return n primary model coefficients
             :pltf is plot_flag
@@ -109,14 +124,15 @@ class LinReg:
             plt.title('Regression coefficients values')
             plt.xticks(range(len(self.X.columns)), self.X.columns)
         sorted_idx = np.flip(abscoefs.argsort())
-        sorted_features = lr.X.columns[sorted_idx]
-
-        for i in range(n):
-            print("feature name:{0}, feature coeff:{1}".format(sorted_features[i], abscoefs[sorted_idx][i]))
+        sorted_features = self.X.columns[sorted_idx]
+        if prtf:
+            for i in range(n):
+                print("feature name:{0}, feature coeff:{1}".format(sorted_features[i], abscoefs[sorted_idx][i]))
+        return mdl.coef_
 
 
 if __name__ == "__main__":
-    lr = LinReg("Known_set_Bacillus.xlsx", drop_wins=False)
+    lr = LinReg(filename="Known_set_Bacillus.xlsx", drop_wins=True)
     best_features = ffs(round(len(lr.X)**0.5), lr.X, lr.Y)
 
     # This part is ugly but not sure how to solve this 'cause pandas are fucking mutable TODO: find better solution
