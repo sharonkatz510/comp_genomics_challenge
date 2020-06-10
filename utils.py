@@ -100,11 +100,16 @@ def gc_count(x: str):
     return x.count('GC')
 
 
+@np.vectorize
+def num_start_codons(x: str):
+    return x.count('ATG')
+
+
 def spear_corr(x, y):
     return pd.Series(x).corr(pd.Series(y), method="spearman")
 
 
-def ffs(k, data, label, fn=spear_corr,coef_limit=None):
+def sfs(k, data, label, fn=spear_corr, coef_limit=None, test_size=0.2):
     """
     This function implements ffs using multi-feature regression and evaluation
     function fn
@@ -112,9 +117,10 @@ def ffs(k, data, label, fn=spear_corr,coef_limit=None):
     data: pandas DataFrame,
     label: pandas series
     fn: Feature evaluation function
+    test_size: proportion of test data from total data
     """
     data["free_var"] = np.ones(len(data))
-    x_train, x_test, y_train, y_test = train_test_split(data, label, test_size=0.2)
+    x_train, x_test, y_train, y_test = train_test_split(data, label, test_size=test_size)
     best_features = 'free_var',
     max_feature_score = 0
     for i in range(k):
@@ -139,4 +145,37 @@ def ffs(k, data, label, fn=spear_corr,coef_limit=None):
         good_features = [ind[0] for ind, coef in np.ndenumerate(reg.coef_) if abs(coef) > coef_limit]
         best_features = [item for i, item in enumerate(feature_list) if i in good_features]
 
+    return best_features
+
+
+def sbs(k, data, label, fn=spear_corr, decrease_limit=0.8, test_size=0.2):
+    """
+    This function implements fbs using multi-feature regression and evaluation
+    function fn
+    k: number of features,
+    data: pandas DataFrame,
+    label: pandas series
+    fn: Feature evaluation function
+    test_size: proportion of test data from total data
+    """
+    data["free_var"] = np.ones(len(data))
+    x_train, x_test, y_train, y_test = train_test_split(data, label, test_size=test_size)
+    best_features = tuple(data.columns)
+    reg = LinearRegression().fit(x_train, y_train)
+    best_score = fn(reg.predict(x_test), y_test)
+    for i in range(len(best_features), k, -1):
+        available_features = list(best_features)
+        feature_scores = {}
+        for feature_name in (k for k in available_features if k is not 'free_var'):
+            feature_list = list(best_features)
+            feature_list.remove(feature_name)
+            feature_comb = x_train[feature_list]
+            reg = LinearRegression().fit(feature_comb, y_train)
+            feature_scores[feature_name] = fn(reg.predict(x_test[feature_list]), y_test)
+        if max(feature_scores.values())< decrease_limit*best_score:
+            break
+        else:
+            best_features = list(best_features)
+            best_features.remove(min(feature_scores, key=feature_scores.get))
+            best_features = tuple(best_features)
     return best_features

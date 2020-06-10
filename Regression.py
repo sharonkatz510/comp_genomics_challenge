@@ -36,6 +36,7 @@ class LinReg:
         self.X['std_win'] = np.std(self.X.iloc[:, 4:104], axis=1)
         self.X['TATA_loc'] = self.str_seriesses['UTR5'].apply(get_tata_loc)
         self.X['GC_count'] = self.str_seriesses['UTR5'].apply(gc_count)
+        self.X['num_start_codons'] = self.str_seriesses['ORF'].apply(num_start_codons)
         for nuc in ['A', 'T', 'G', 'C']: self.X["utr_{0}_freq".format(nuc)] = get_nuc_freq(nuc,
                                                                                            self.str_seriesses['UTR5'])
         for nuc in ['A', 'T', 'G', 'C']: self.X["orf_{0}_freq".format(nuc)] = get_nuc_freq(nuc,
@@ -133,7 +134,7 @@ class LinReg:
 
 if __name__ == "__main__":
     lr = LinReg(filename="Known_set_Bacillus.xlsx", drop_wins=True)
-    best_features = ffs(round(len(lr.X)**0.5), lr.X, lr.Y)
+    best_features = sfs(round(len(lr.X) ** 0.5), lr.X, lr.Y)
 
     # This part is ugly but not sure how to solve this 'cause pandas are fucking mutable TODO: find better solution
     best_data = Bunch()
