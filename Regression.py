@@ -34,6 +34,8 @@ class LinReg:
         self.X['free_var'] = np.ones(len(self.X))
         self.X['avg_win'] = np.mean(self.X.iloc[:, 4:104], axis=1)
         self.X['std_win'] = np.std(self.X.iloc[:, 4:104], axis=1)
+        self.X['ORF_len'] = self.str_seriesses['ORF'].apply(len)
+        self.X['UTR_len'] = self.str_seriesses['UTR5'].apply(len)
         self.X['TATA_loc'] = self.str_seriesses['UTR5'].apply(get_tata_loc)
         self.X['GC_count'] = self.str_seriesses['UTR5'].apply(gc_count)
         self.X['num_start_codons'] = self.str_seriesses['ORF'].apply(num_start_codons)
@@ -130,6 +132,29 @@ class LinReg:
             for i in range(n):
                 print("feature name:{0}, feature coeff:{1}".format(sorted_features[i], abscoefs[sorted_idx][i]))
         return mdl.coef_
+
+
+class RidgeReg(LinReg):
+    def __init__(self, **kwargs):
+        LinReg.__init__(self, **kwargs)
+        [self.model, self.train_test_data] = self.get_model(**kwargs)
+
+    def get_model(self, **kwargs):
+        """
+        Train a linear regressor based on inside or outside data and return model and data split
+        """
+        train_test_data = kwargs.get('train_test_data', None)
+        test_size = kwargs.get('test_size', 0.3)
+        normalize = kwargs.get('normalize', False)
+        if train_test_data is None:
+            train_test_data = Bunch()
+            y = self.normalized_Y if normalize else self.Y
+            train_test_data.x_train, train_test_data.x_test, \
+            train_test_data.y_train, train_test_data.y_test = \
+                train_test_split(self.X, y, test_size=test_size)
+        reg = Ridge()
+        reg.fit(train_test_data.x_train, train_test_data.y_train)
+        return reg, train_test_data
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-
+from sklearn.linear_model import Ridge
 
 NT2AA_dict = {
     'ATA': 'I', 'ATC': 'I', 'ATT': 'I', 'ATG': 'M',
@@ -21,8 +21,8 @@ NT2AA_dict = {
     'GGA': 'G', 'GGC': 'G', 'GGG': 'G', 'GGT': 'G',
     'TCA': 'S', 'TCC': 'S', 'TCG': 'S', 'TCT': 'S',
     'TTC': 'F', 'TTT': 'F', 'TTA': 'L', 'TTG': 'L',
-    'TAC': 'Y', 'TAT': 'Y', 'TAA': '_', 'TAG': '_',
-    'TGC': 'C', 'TGT': 'C', 'TGA': '_', 'TGG': 'W',
+    'TAC': 'Y', 'TAT': 'Y', 'TAA': None, 'TAG': None,
+    'TGC': 'C', 'TGT': 'C', 'TGA': None, 'TGG': 'W',
 }
 
 

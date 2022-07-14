@@ -4,4 +4,4 @@
 *.ini
 .idea/
 *.txt
-*.ipynb
+__pycache__
